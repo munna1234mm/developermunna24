@@ -285,6 +285,55 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"success": False, "message": str(e)}, 500)
             return
 
+        # ---- USER: Dashboard & Membership Limits ----
+        if path in ("/api/user/dashboard", "/api/user/membership"):
+            url = REMOTE_HOST + self.path
+            req = urllib.request.Request(url, method="GET")
+            req.add_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+            
+            try:
+                resp = opener.open(req)
+                resp_body = resp.read()
+                data = json.loads(resp_body.decode())
+                
+                # MOCK: Increase limits to 5
+                # Dashboard structure: {"tierLimits": {"dailyChecks": 2, ...}, "dailyUsage": {"checks": 0, ...}}
+                # Membership structure might be different, but we try to find the limits
+                
+                def patch_limits(obj):
+                    if isinstance(obj, dict):
+                        # Fix limits
+                        if "tierLimits" in obj and isinstance(obj["tierLimits"], dict):
+                            tl = obj["tierLimits"]
+                            for k in tl:
+                                if isinstance(tl[k], int) and tl[k] > 0 and tl[k] < 5:
+                                    tl[k] = 5  # Set minimum limit to 5
+                        
+                        # Fix usage (optional, but good for appearance)
+                        if "dailyUsage" in obj and isinstance(obj["dailyUsage"], dict):
+                            pass # We leave usage as is or cap it
+                        
+                        # Recursively patch if needed
+                        for k in obj:
+                            patch_limits(obj[k])
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            patch_limits(item)
+
+                patch_limits(data)
+                
+                new_body = json.dumps(data).encode()
+                self.send_response(resp.status)
+                for k, v in resp.getheaders():
+                    if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "content-length"):
+                        self.send_header(k, v)
+                self.send_header("Content-Length", str(len(new_body)))
+                self.end_headers()
+                self.wfile.write(new_body)
+                return
+            except:
+                pass
+
         # ---- AUTH: Logout ----
         if path == "/api/auth/logout":
             current_session_user = None
