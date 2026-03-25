@@ -1,0 +1,11 @@
+# Git Ignore for Nexvora Hitter
+__pycache__/
+*.pyc
+.env
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+dist/
+build/
+*.log

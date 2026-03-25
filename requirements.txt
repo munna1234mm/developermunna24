@@ -1,0 +1,3 @@
+# Nexvora Hitter - Dependencies
+# This project uses only standard Python libraries for the main server.
+# However, Render might expect a dependencies file to recognize the project.
