@@ -410,6 +410,22 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"  [BOT] Could not fetch bot info: {e}")
 
+    # Self-ping to stay awake on Render free tier
+    def keep_alive():
+        url = os.environ.get("RENDER_EXTERNAL_URL")
+        if not url:
+            url = f"http://127.0.0.1:{PORT}/"
+        
+        while True:
+            try:
+                time.sleep(600)  # 10 minutes
+                req = urllib.request.Request(url)
+                req.add_header("User-Agent", "KeepAlive-Bot")
+                urllib.request.urlopen(req, timeout=10)
+                # print(f"  [KEEP-ALIVE] Pinged {url}")
+            except:
+                pass
+
     server = http.server.HTTPServer(("0.0.0.0", PORT), Handler)
     print(f"[*] {APP_NAME} running at http://127.0.0.1:{PORT}/")
     print(f"    Login: Via website (OTP from your bot)")
@@ -418,6 +434,8 @@ if __name__ == "__main__":
     # Start bot tasks in background so server starts immediately
     def start_bot():
         update_bot_username()
+        # Start keep-alive thread
+        threading.Thread(target=keep_alive, daemon=True).start()
         bot_polling()
 
     bot_thread = threading.Thread(target=start_bot, daemon=True)
