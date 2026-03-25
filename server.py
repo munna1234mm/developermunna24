@@ -331,53 +331,50 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
 
         # ---- USER: Dashboard & Membership Limits ----
-        if path in ("/api/user/dashboard", "/api/user/membership"):
-            url = REMOTE_HOST + self.path
-            req = urllib.request.Request(url, method="GET")
-            req.add_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-            
-            try:
-                resp = opener.open(req)
-                resp_body = resp.read()
-                data = json.loads(resp_body.decode())
-                
-                # MOCK: Increase limits to 5
-                # Dashboard structure: {"tierLimits": {"dailyChecks": 2, ...}, "dailyUsage": {"checks": 0, ...}}
-                # Membership structure might be different, but we try to find the limits
-                
-                def patch_limits(obj):
-                    if isinstance(obj, dict):
-                        # Fix limits
-                        if "tierLimits" in obj and isinstance(obj["tierLimits"], dict):
-                            tl = obj["tierLimits"]
-                            for k in tl:
-                                if isinstance(tl[k], int) and tl[k] > 0 and tl[k] < 5:
-                                    tl[k] = 5  # Set minimum limit to 5
-                        
-                        # Fix usage (optional, but good for appearance)
-                        if "dailyUsage" in obj and isinstance(obj["dailyUsage"], dict):
-                            pass # We leave usage as is or cap it
-                        
-                        # Recursively patch if needed
-                        for k in obj:
-                            patch_limits(obj[k])
-                    elif isinstance(obj, list):
-                        for item in obj:
-                            patch_limits(item)
+        if path == "/api/user/dashboard":
+            # Spoofing the dashboard to reset "Total Users" and "Total Hits"
+            # and to provide "Unlimited" tier limits.
+            spoofed_data = {
+                "success": True,
+                "user": current_session_user,
+                "totalUsers": 120,   # Fresh start number
+                "totalHits": 250,    # Fresh start number
+                "userHits": 0,
+                "userRank": "-",
+                "tier": "gold",      # Give them gold tier look
+                "tierLimits": {
+                    "dailyChecks": -1,
+                    "dailyShopifyChecks": -1,
+                    "dailyFindsiteSearches": -1,
+                    "parallelWorkers": 50,
+                    "tierName": "Unlimited"
+                },
+                "dailyUsage": {
+                    "checks": 0,
+                    "shopifyChecks": 0,
+                    "findsiteSearches": 0
+                },
+                "premiumExpiry": None
+            }
+            self._send_json(spoofed_data)
+            print("  [DASHBOARD] Spoofed Unlimited Dashboard response.")
+            return
 
-                patch_limits(data)
-                
-                new_body = json.dumps(data).encode()
-                self.send_response(resp.status)
-                for k, v in resp.getheaders():
-                    if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "content-length"):
-                        self.send_header(k, v)
-                self.send_header("Content-Length", str(len(new_body)))
-                self.end_headers()
-                self.wfile.write(new_body)
-                return
-            except:
-                pass
+        if path == "/api/user/membership":
+            # Also spoof membership limits if checked separately
+            spoofed_limits = {
+                "success": True,
+                "tierLimits": {
+                    "dailyChecks": -1,
+                    "dailyShopifyChecks": -1,
+                    "dailyFindsiteSearches": -1,
+                    "parallelWorkers": 50,
+                    "tierName": "Unlimited"
+                }
+            }
+            self._send_json(spoofed_limits)
+            print("  [MEMBERSHIP] Spoofed Unlimited Membership response.")
+            return
 
         # ---- AUTH: Logout ----
         if path == "/api/auth/logout":
