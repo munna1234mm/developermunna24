@@ -27,6 +27,11 @@ BOT_TOKEN = "8680374467:AAGin7F5co5ax8Y1wb6zdoZvVnUieaqz7x4"
 ADMIN_ID = "8766583877"
 # Rebranded Group
 HIT_GROUP = "@hitterlite"
+TG_GROUP_URL = "https://t.me/hitterlite"
+TG_CHANNEL_URL = "https://t.me/hitterlite"
+
+# Memory for Join Gate (User IDs that clicked "Refresh")
+JOINED_USERS = set()
 
 # Persist files
 COOKIE_FILE = os.path.join(STATIC_DIR, "cookies.txt")
@@ -331,9 +336,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
 
         # ---- USER: Dashboard & Membership Limits ----
+        is_refresh = "refresh=true" in self.path
+        uid = str(current_session_user.get("userId")) if current_session_user else None
+        
+        if is_refresh and uid:
+            JOINED_USERS.add(uid)
+            print(f"  [GATE] User {uid} marked as joined.")
+
+        is_member = (uid in JOINED_USERS) if uid else False
+
         if path == "/api/user/dashboard":
             # Spoofing the dashboard to reset "Total Users" and "Total Hits"
-            # and to provide "Unlimited" tier limits.
+            # and to provide "Unlimited" tier limits + Join Gate Links.
             spoofed_data = {
                 "success": True,
                 "user": current_session_user,
@@ -342,6 +356,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "userHits": 0,
                 "userRank": "-",
                 "tier": "gold",      # Give them gold tier look
+                "member": is_member, # This controls the Join Gate
+                "groupLink": TG_GROUP_URL,
+                "channelLink": TG_CHANNEL_URL,
                 "tierLimits": {
                     "dailyChecks": -1,
                     "dailyShopifyChecks": -1,
@@ -357,13 +374,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "premiumExpiry": None
             }
             self._send_json(spoofed_data)
-            print("  [DASHBOARD] Spoofed Unlimited Dashboard response.")
+            print(f"  [DASHBOARD] Spoofed. Member: {is_member}")
             return
 
         if path == "/api/user/membership":
-            # Also spoof membership limits if checked separately
+            # Also spoof membership limits and join status
             spoofed_limits = {
                 "success": True,
+                "member": is_member,
+                "status": "not_in_group_or_channel" if not is_member else "active",
+                "groupLink": TG_GROUP_URL,
+                "channelLink": TG_CHANNEL_URL,
                 "tierLimits": {
                     "dailyChecks": -1,
                     "dailyShopifyChecks": -1,
@@ -373,7 +394,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 }
             }
             self._send_json(spoofed_limits)
-            print("  [MEMBERSHIP] Spoofed Unlimited Membership response.")
+            print(f"  [MEMBERSHIP] Spoofed. Member: {is_member}")
             return
 
         # ---- AUTH: Logout ----
