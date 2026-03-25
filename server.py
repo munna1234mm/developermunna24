@@ -277,9 +277,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if os.path.isfile(file_path) or path == "/":
                 super().do_GET()
             else:
-                # SPA fallback: serve autohitter.html for all routes
+                # SPA fallback: serve index.html for all routes
                 # so React router can handle client-side navigation
-                self.path = "/autohitter.html"
+                self.path = "/index.html"
                 super().do_GET()
 
     def do_POST(self):
@@ -411,7 +411,7 @@ if __name__ == "__main__":
             print(f"  [BOT] Could not fetch bot info: {e}")
 
     server = http.server.HTTPServer(("0.0.0.0", PORT), Handler)
-    print(f"[*] {APP_NAME} running at http://127.0.0.1:{PORT}/autohitter.html")
+    print(f"[*] {APP_NAME} running at http://127.0.0.1:{PORT}/")
     print(f"    Login: Via website (OTP from your bot)")
     print("    Press Ctrl+C to stop")
 
