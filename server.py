@@ -216,6 +216,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_response(resp.status)
             for k, v in resp.getheaders():
                 if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "content-length"):
+                    # Inject Max-Age to prevent session cookies from expiring on close
+                    if k.lower() == "set-cookie":
+                        v += "; Max-Age=31536000; Path=/; SameSite=Lax"
                     self.send_header(k, v)
             self.send_header("Content-Length", str(len(resp_body)))
             self.end_headers()
